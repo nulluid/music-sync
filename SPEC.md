@@ -41,8 +41,7 @@ which is exactly what the JSPF spec's `extension` field is for.
           "https://music.smathe.rs/ns#": {
             "isrc": "GBAAA9700003",
             "spotify": { "id": "2tnVG71enUj4Yc8JEa0W5A" },
-            "ytmusic": { "videoId": "k0BWlvnBmIE" },
-            "amazon": { "asin": null }
+            "ytmusic": { "id": "k0BWlvnBmIE" }
           }
         }
       }
@@ -56,11 +55,13 @@ which is exactly what the JSPF spec's `extension` field is for.
 Title/artist string matching is what breaks in every playlist-transfer tool
 (remasters, "feat." formatting, live versions). An ISRC is the one
 cross-service identifier that means the same recording everywhere.
-`matcher.py` tries ISRC first and falls back to normalized title + artist +
+`matcher.ts` tries ISRC first and falls back to normalized title + artist +
 duration-within-3-seconds only when a service doesn't expose ISRC in search
-results (YouTube Music's public search does not; Spotify and Amazon Music
-do, so ISRC round-trips through Spotify or Amazon are reliable and YouTube
-Music is the weak link).
+results. Spotify's Web API returns ISRC directly, so Spotify round-trips are
+reliable. YouTube Music playlists are managed through the official YouTube
+Data API v3 (search.list never returns ISRC) and Amazon Music through
+browser automation against the web UI (no ISRC either), so both are always
+fuzzy matches — the weak link in any sync.
 
 ## File extension
 
