@@ -22,7 +22,7 @@ import type { Candidate } from "../matcher.js";
 import { AuthRequired, type MusicService } from "./base.js";
 import { SPOTIFY_ENV, SPOTIFY_TOKEN_CACHE, loadEnvFile } from "../config.js";
 
-const SCOPES = "playlist-read-private playlist-modify-private playlist-modify-public";
+const SCOPES = "playlist-read-private playlist-modify-private playlist-modify-public user-read-private";
 const REDIRECT_URI = "http://127.0.0.1:8765/callback";
 const AUTH_URL = "https://accounts.spotify.com/authorize";
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
@@ -199,7 +199,7 @@ export class SpotifyService implements MusicService {
 
   async getPlaylistTracks(playlistId: string): Promise<Candidate[]> {
     const out: Candidate[] = [];
-    let next: string | null = `/playlists/${playlistId}/tracks?limit=100`;
+    let next: string | null = `/playlists/${playlistId}/items?limit=100`;
     while (next) {
       const data: any = await this.api(next);
       for (const item of data.items) {
@@ -223,8 +223,10 @@ export class SpotifyService implements MusicService {
   }
 
   async createPlaylist(title: string, description = ""): Promise<string> {
-    const me = await this.api("/me");
-    const playlist = await this.api(`/users/${me.id}/playlists`, {
+    // POST /users/{id}/playlists was removed in Spotify's February 2026 API
+    // overhaul (confirmed live: it now 403s even for a Premium, allow-listed
+    // account) in favor of this one, which no longer needs the user id at all.
+    const playlist = await this.api("/me/playlists", {
       method: "POST",
       body: JSON.stringify({ name: title, public: false, description }),
     });
@@ -234,7 +236,7 @@ export class SpotifyService implements MusicService {
   async addTracks(playlistId: string, trackIds: string[]): Promise<void> {
     const uris = trackIds.map((id) => `spotify:track:${id}`);
     for (let i = 0; i < uris.length; i += 100) {
-      await this.api(`/playlists/${playlistId}/tracks`, {
+      await this.api(`/playlists/${playlistId}/items`, {
         method: "POST",
         body: JSON.stringify({ uris: uris.slice(i, i + 100) }),
       });
@@ -243,12 +245,12 @@ export class SpotifyService implements MusicService {
 
   async replaceTracks(playlistId: string, trackIds: string[]): Promise<void> {
     const uris = trackIds.map((id) => `spotify:track:${id}`);
-    await this.api(`/playlists/${playlistId}/tracks`, {
+    await this.api(`/playlists/${playlistId}/items`, {
       method: "PUT",
       body: JSON.stringify({ uris: uris.slice(0, 100) }),
     });
     for (let i = 100; i < uris.length; i += 100) {
-      await this.api(`/playlists/${playlistId}/tracks`, {
+      await this.api(`/playlists/${playlistId}/items`, {
         method: "POST",
         body: JSON.stringify({ uris: uris.slice(i, i + 100) }),
       });

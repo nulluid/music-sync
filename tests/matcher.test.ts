@@ -16,6 +16,27 @@ describe("match", () => {
     expect(result.confidence).toBe(100);
   });
 
+  it("matches a YouTube-style video title carrying extra words around the real title", () => {
+    // Regression test: a plain edit-distance comparison scores this low purely
+    // because the candidate string is longer, even though it's a clean match.
+    const track = newTrack({
+      title: "Devil in This Holler",
+      creator: "The Steel Woods",
+      duration: 283000,
+    });
+    const candidates: Candidate[] = [
+      {
+        id: "yt1",
+        title: "The Steel Woods - Devil In This Holler [Official Audio]",
+        artist: "The Steel Woods",
+        duration: 283000,
+      },
+    ];
+    const result = match(track, candidates);
+    expect(result.method).toBe("fuzzy");
+    expect(result.candidate?.id).toBe("yt1");
+  });
+
   it("falls back to fuzzy matching without an isrc", () => {
     const track = newTrack({ title: "Breathe", creator: "The Prodigy", duration: 349000 });
     const candidates: Candidate[] = [

@@ -26,12 +26,25 @@ export interface MatchResult {
   method: "isrc" | "fuzzy" | "none";
 }
 
-function normalize(text: string): string {
-  return text.toLowerCase().replace(/feat\./g, "feat").split(/\s+/).filter(Boolean).join(" ");
-}
+const NOISE_WORDS = new Set([
+  "official",
+  "audio",
+  "video",
+  "lyric",
+  "lyrics",
+  "visualizer",
+  "hd",
+  "hq",
+  "remastered",
+]);
 
-function tokenSort(text: string): string {
-  return text.split(" ").filter(Boolean).sort().join(" ");
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/feat\./g, "feat")
+    .replace(/[([][^)\]]*[)\]]/g, " ") // strip "(...)" / "[...]" suffixes like [Official Audio]
+    .split(/[^a-z0-9']+/)
+    .filter((t) => t && !NOISE_WORDS.has(t));
 }
 
 function levenshtein(a: string, b: string): number {
@@ -51,13 +64,27 @@ function levenshtein(a: string, b: string): number {
   return dp[b.length];
 }
 
-/** 0-100 similarity, order-insensitive (sorts tokens before comparing). */
-function tokenSortRatio(a: string, b: string): number {
-  const sa = tokenSort(normalize(a));
-  const sb = tokenSort(normalize(b));
-  const maxLen = Math.max(sa.length, sb.length);
+function ratio(a: string, b: string): number {
+  const maxLen = Math.max(a.length, b.length);
   if (maxLen === 0) return 100;
-  return (1 - levenshtein(sa, sb) / maxLen) * 100;
+  return (1 - levenshtein(a, b) / maxLen) * 100;
+}
+
+/**
+ * 0-100 similarity that doesn't penalize one side for carrying extra words —
+ * essential for YouTube video titles like "Artist - Track [Official Audio]"
+ * against a clean "Track" title, where plain edit distance scores low just
+ * because the strings are different lengths.
+ */
+function tokenSetRatio(a: string, b: string): number {
+  const setA = new Set(tokenize(a));
+  const setB = new Set(tokenize(b));
+  const intersection = [...setA].filter((t) => setB.has(t)).sort().join(" ");
+  const onlyA = [...setA].filter((t) => !setB.has(t)).sort().join(" ");
+  const onlyB = [...setB].filter((t) => !setA.has(t)).sort().join(" ");
+  const combinedA = [intersection, onlyA].filter(Boolean).join(" ");
+  const combinedB = [intersection, onlyB].filter(Boolean).join(" ");
+  return Math.max(ratio(intersection, combinedA), ratio(intersection, combinedB), ratio(combinedA, combinedB));
 }
 
 export function match(track: Track, candidates: Candidate[]): MatchResult {
@@ -77,8 +104,8 @@ export function match(track: Track, candidates: Candidate[]): MatchResult {
     ) {
       continue;
     }
-    const titleScore = tokenSortRatio(track.title, c.title);
-    const artistScore = tokenSortRatio(track.creator, c.artist);
+    const titleScore = tokenSetRatio(track.title, c.title);
+    const artistScore = tokenSetRatio(track.creator, c.artist);
     const score = 0.6 * titleScore + 0.4 * artistScore;
     if (score > bestScore) {
       bestScore = score;

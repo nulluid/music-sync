@@ -86,6 +86,24 @@ describe("upload", () => {
     expect(service.playlists.existing).toEqual([]); // replaced, not appended to
   });
 
+  it("retries with just the primary artist when a literal 'feat.' search misses", async () => {
+    // Regression test: a strict field search for an artist string containing
+    // "feat. X" can come back empty even though the track is really there,
+    // credited only under the primary artist (confirmed live on Spotify).
+    const service = new FakeService("spotify", [
+      { id: "sp1", title: "Heavy Is the Head", artist: "Zac Brown Band" },
+    ]);
+    const playlist = newPlaylist({
+      title: "Long Drives",
+      tracks: [newTrack({ title: "Heavy Is the Head", creator: "Zac Brown Band feat. Chris Cornell" })],
+    });
+
+    const report = await upload(playlist, service);
+
+    expect(unmatched(report)).toEqual([]);
+    expect(service.playlists[report.playlistId]).toEqual(["sp1"]);
+  });
+
   it("reports unmatched tracks without failing", async () => {
     const service = new FakeService("spotify", []);
     const playlist = newPlaylist({
