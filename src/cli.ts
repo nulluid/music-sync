@@ -5,6 +5,8 @@ import { Command } from "commander";
 
 import { DEFAULT_BACKUP_DIR } from "./config.js";
 import { loadPlaylist, savePlaylist, type Service } from "./format.js";
+import { loadJobs, removeJob, upsertJob } from "./jobs.js";
+import { runAllJobs, runJob } from "./scheduler.js";
 import { AuthRequired, getService, SERVICE_NAMES } from "./services/index.js";
 import { download, sync, upload, unmatched, type ServiceReport } from "./sync.js";
 
@@ -138,6 +140,67 @@ program
         process.exitCode = 1;
       } else {
         throw e;
+      }
+    }
+  });
+
+const jobs = program.command("jobs").description("manage recurring sync jobs");
+
+jobs
+  .command("add")
+  .requiredOption("--name <playlistName>", "exact playlist name on every service")
+  .requiredOption("--source <service>", `source of truth: ${SERVICE_NAMES.join(", ")}`)
+  .requiredOption("--to <services>", "comma-separated targets")
+  .description("register a recurring sync job (or replace one with the same name)")
+  .action((opts: { name: string; source: Service; to: string }) => {
+    upsertJob({ name: opts.name, source: opts.source, targets: parseServiceList(opts.to) });
+    console.log(`Registered: ${opts.name} (${opts.source} -> ${opts.to})`);
+  });
+
+jobs
+  .command("remove")
+  .argument("<name>")
+  .description("remove a recurring sync job")
+  .action((name: string) => {
+    removeJob(name);
+    console.log(`Removed: ${name}`);
+  });
+
+jobs
+  .command("list")
+  .description("list registered sync jobs")
+  .action(() => {
+    for (const job of loadJobs()) {
+      console.log(`${job.name}: ${job.source} -> ${job.targets.join(", ")}`);
+    }
+  });
+
+jobs
+  .command("run")
+  .argument("[name]", "run a single job by name, or every job if omitted")
+  .description("run registered sync jobs immediately")
+  .action(async (name?: string) => {
+    let results;
+    if (name) {
+      const job = loadJobs().find((j) => j.name === name);
+      if (!job) {
+        console.error(`no job named "${name}"`);
+        process.exitCode = 1;
+        return;
+      }
+      results = [await runJob(job)];
+    } else {
+      results = await runAllJobs();
+    }
+    for (const r of results) {
+      if (r.ok) {
+        console.log(`${r.job.name}: synced ${r.trackCount} tracks`);
+        for (const report of r.reports ?? []) {
+          console.log(`  ${report.service}: ${report.created ? "created" : "updated"} ${report.playlistId}`);
+          if (report.unmatchedCount) console.log(`    ${report.unmatchedCount} unmatched`);
+        }
+      } else {
+        console.error(`${r.job.name}: FAILED — ${r.error}`);
       }
     }
   });

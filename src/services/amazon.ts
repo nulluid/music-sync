@@ -9,14 +9,13 @@
  * access; an individual doesn't. So this backend drives the real
  * music.amazon.com web UI instead.
  *
- * This makes it the most fragile of the three backends: selectors below
- * are written from Amazon Music's documented UI structure, not verified
- * against a live authenticated session (playlist management is behind
- * login, which needs you present). The first real run should use
- * `music-sync auth amazon --headed` so you can confirm each selector still
- * matches before trusting it unattended. Expect this file to need small
- * fixes when Amazon changes their frontend; `npx playwright codegen
- * https://music.amazon.com` is the fastest way to re-record a broken one.
+ * This makes it the most fragile of the three backends: the track-row
+ * selectors in search/getPlaylistTracks/etc. are written from Amazon
+ * Music's documented UI structure, not verified against a live session
+ * (playlist management is behind login, which needs you present). Expect
+ * this file to need small fixes when Amazon changes their frontend;
+ * `npx playwright codegen https://music.amazon.com` (reusing the saved
+ * storage state) is the fastest way to re-record a broken one.
  *
  * One-time setup:
  *
@@ -24,7 +23,7 @@
  *                             # session is saved to config.AMAZON_STORAGE_STATE
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import type { Browser, BrowserContext, Page } from "playwright";
 
 import type { Candidate } from "../matcher.js";
@@ -69,8 +68,26 @@ export class AmazonMusicService implements MusicService {
     const browser = await chromium.launch({ headless: false });
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.goto(`${BASE_URL}/login`);
-    await page.waitForSelector("text=Your Library", { timeout: 0 });
+    // There's no dedicated /login route (it 404s — confirmed live). Go to the
+    // homepage and click the real "Sign In" entry point instead.
+    await page.goto(BASE_URL);
+    await page.getByRole("button", { name: "Sign In" }).click({ timeout: 30_000 }).catch(() => {});
+    // `at-main` is Amazon's actual authenticated-session cookie. Everything
+    // else present even for an anonymous visitor (session-id, session-token,
+    // ubid-main) is not proof of login — confirmed by inspecting a "successful"
+    // run that turned out not to be. Poll for it rather than trusting a URL or
+    // UI-text heuristic.
+    const deadline = Date.now() + 10 * 60_000;
+    while (Date.now() < deadline) {
+      const cookies = await context.cookies();
+      if (cookies.some((c) => c.name === "at-main" && c.value)) break;
+      await page.waitForTimeout(2000);
+    }
+    const cookies = await context.cookies();
+    if (!cookies.some((c) => c.name === "at-main" && c.value)) {
+      await browser.close();
+      throw new Error("Amazon login did not complete within 10 minutes (no at-main cookie).");
+    }
     await context.storageState({ path: AMAZON_STORAGE_STATE });
     await browser.close();
   }
@@ -78,13 +95,17 @@ export class AmazonMusicService implements MusicService {
   async isAuthenticated(): Promise<boolean> {
     if (!existsSync(AMAZON_STORAGE_STATE)) return false;
     try {
-      const page = await this.ensurePage();
-      await page.waitForSelector("text=Your Library", { timeout: 10_000 });
+      // A pure file read, not a browser launch — this must stay cheap per the
+      // MusicService contract. `at-main` is Amazon's real auth cookie; other
+      // cookies (session-id, session-token, ubid-main) exist for anonymous
+      // visitors too and prove nothing.
+      const state = JSON.parse(readFileSync(AMAZON_STORAGE_STATE, "utf-8"));
+      const atMain = (state.cookies ?? []).find((c: { name: string }) => c.name === "at-main");
+      if (!atMain?.value) return false;
+      if (atMain.expires && atMain.expires > 0 && atMain.expires * 1000 < Date.now()) return false;
       return true;
     } catch {
       return false;
-    } finally {
-      await this.close();
     }
   }
 
