@@ -1,7 +1,11 @@
 # music-sync
 
 Upload, sync, and back up playlists across Spotify, YouTube Music, and Amazon Music. Playlists are
-stored locally as JSPF (see [SPEC.md](SPEC.md)).
+stored locally as JSPF (see [SPEC.md](SPEC.md)). Open source under the [MIT License](LICENSE); see
+[PRIVACY.md](PRIVACY.md) and [TERMS.md](TERMS.md) for what it accesses and the terms it's offered
+under. YouTube Music access uses the official [YouTube Data API
+v3](https://developers.google.com/youtube/v3) — see the comment at the top of
+`src/services/ytmusic.ts` for the technical detail.
 
 ## Setup
 
