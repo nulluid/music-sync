@@ -24,7 +24,10 @@ class FakeService implements MusicService {
   }
   async authenticate() {}
 
+  failSearch = false;
+
   async search(title: string, artist: string, limit = 5) {
+    if (this.failSearch) throw new Error("simulated quota exhaustion");
     return this.catalog.filter((c) => c.title === title && c.artist === artist).slice(0, limit);
   }
 
@@ -84,6 +87,23 @@ describe("upload", () => {
     expect(report.createdPlaylist).toBe(false);
     expect(report.playlistId).toBe("existing");
     expect(service.playlists.existing).toEqual([]); // replaced, not appended to
+  });
+
+  it("refuses to replace a live playlist when search fails systemically, rather than wiping it", async () => {
+    // Regression test for a real incident: a YouTube Data API v3 search-quota
+    // outage made every track look "unmatched," and replaceTracks([]) emptied
+    // an already-correct playlist. Search failing must leave the target alone.
+    const service = new FakeService("ytmusic", [], { existing: ["already-there-1", "already-there-2"] });
+    service.titles.existing = "Country Powerlifting";
+    service.failSearch = true;
+    const playlist = newPlaylist({
+      title: "Country Powerlifting",
+      tracks: [newTrack({ title: "Axe", creator: "The Steel Woods" })],
+    });
+
+    await expect(upload(playlist, service)).rejects.toThrow(/could not be searched/);
+
+    expect(service.playlists.existing).toEqual(["already-there-1", "already-there-2"]);
   });
 
   it("retries with just the primary artist when a literal 'feat.' search misses", async () => {

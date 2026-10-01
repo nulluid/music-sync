@@ -15,7 +15,11 @@ import type { MusicService } from "./services/base.js";
 export interface TrackResult {
   track: Track;
   service: Service;
-  status: "matched" | "fuzzy_matched" | "unmatched";
+  // "unmatched" = genuinely searched, nothing good enough found (safe to
+  // cache as a negative match). "error" = the search itself failed (quota,
+  // network) — we never actually checked, so this must NOT be treated as
+  // "confirmed absent" by anything downstream.
+  status: "matched" | "fuzzy_matched" | "unmatched" | "error";
   confidence: number;
   serviceTrackId: string | null;
 }
@@ -37,18 +41,24 @@ export function unmatched(report: ServiceReport): TrackResult[] {
 const FEATURED_ARTIST = /\s+(feat\.?|ft\.?|featuring)\s+.+$/i;
 
 async function searchWithFallback(service: MusicService, track: Track): Promise<Candidate[]> {
+  const primaryArtist = track.creator.replace(FEATURED_ARTIST, "").trim();
+  const hasFallback = primaryArtist !== track.creator;
+
   try {
     const candidates = await service.search(track.title, track.creator);
     if (candidates.length > 0) return candidates;
-  } catch {
-    // fall through to the retry below rather than aborting
+  } catch (e) {
+    // Only swallow this if there's a different query left to try — with no
+    // fallback, swallowing it would turn a real failure into a false "found
+    // nothing," which is exactly the bug that let a quota outage wipe a live
+    // playlist (see the "refuses to replace" test in sync.test.ts).
+    if (!hasFallback) throw e;
   }
+  if (!hasFallback) return [];
   // Some services (confirmed on Spotify: a strict artist: field filter) return
   // nothing for "Zac Brown Band feat. Chris Cornell" as a literal artist string,
   // since the featured artist is credited separately, not part of the name.
   // Retrying with just the primary artist recovers these.
-  const primaryArtist = track.creator.replace(FEATURED_ARTIST, "").trim();
-  if (primaryArtist === track.creator) return [];
   // Unlike the first attempt, a failure here must propagate: resolveTrackId
   // needs to tell "genuinely searched, found nothing" (safe to cache as a
   // negative match) apart from "the search itself failed" (quota, network —
@@ -74,12 +84,13 @@ async function resolveTrackId(service: MusicService, track: Track): Promise<Trac
 
   // A single track's search failing (rate limit, transient 5xx) must not abort
   // the other 25 in the same Promise.all batch, and must not cache a false
-  // negative — report unmatched for this run only, retry next time.
+  // negative — report "error" (not "unmatched": upload() treats those very
+  // differently) for this run only, retry next time.
   let candidates: Candidate[];
   try {
     candidates = await searchWithFallback(service, track);
   } catch {
-    return { track, service: service.name, status: "unmatched", confidence: 0, serviceTrackId: null };
+    return { track, service: service.name, status: "error", confidence: 0, serviceTrackId: null };
   }
   const result = match(track, candidates);
   if (!result.candidate) {
@@ -103,6 +114,21 @@ export async function upload(playlist: Playlist, service: MusicService): Promise
 
   const results = await Promise.all(playlist.tracks.map((t) => resolveTrackId(service, t)));
   const trackIds = results.map((r) => r.serviceTrackId).filter((id): id is string => id !== null);
+
+  // A systemic failure (search quota exhausted, network down) must not be
+  // allowed to look like "every track was genuinely absent" and wipe a live
+  // playlist via replaceTracks([]) — this happened for real: a quota outage
+  // mid-run emptied an already-correct YouTube Music playlist. If anything
+  // errored rather than being confirmed unmatched, refuse to touch the
+  // target at all; the caller (sync()'s per-target catch, or the CLI) treats
+  // this the same as any other target failure and retries next run.
+  const errored = results.filter((r) => r.status === "error");
+  if (errored.length > 0) {
+    throw new Error(
+      `${errored.length}/${results.length} tracks could not be searched (not "not found" — the search itself ` +
+        `failed) — refusing to ${created ? "add partial results to the new" : "replace the"} playlist`
+    );
+  }
 
   if (created) await service.addTracks(playlistId, trackIds);
   else await service.replaceTracks(playlistId, trackIds);
