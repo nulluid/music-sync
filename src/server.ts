@@ -146,9 +146,10 @@ app.get("/", requireAuth, (_req, res) => {
           ? `${s.trackCount} tracks, last run ${s.ranAt}`
           : `FAILED: ${s.error} (${s.ranAt})`;
       const reportRows = (s?.reports ?? [])
-        .map(
-          (r) =>
-            `<li>${r.service}: ${r.created ? "created" : "updated"} ${r.playlistId}${r.unmatchedCount ? ` — ${r.unmatchedCount} unmatched` : ""}</li>`
+        .map((r) =>
+          r.error
+            ? `<li>${r.service}: FAILED — ${r.error}</li>`
+            : `<li>${r.service}: ${r.created ? "created" : "updated"} ${r.playlistId}${r.unmatchedCount ? ` — ${r.unmatchedCount} unmatched` : ""}</li>`
         )
         .join("");
       return `<tr>

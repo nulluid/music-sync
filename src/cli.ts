@@ -11,6 +11,10 @@ import { AuthRequired, getService, SERVICE_NAMES } from "./services/index.js";
 import { download, sync, upload, unmatched, type ServiceReport } from "./sync.js";
 
 function printReport(report: ServiceReport): void {
+  if (report.error) {
+    console.log(`  ${report.service}: FAILED — ${report.error}`);
+    return;
+  }
   const verb = report.createdPlaylist ? "created" : "updated";
   console.log(`  ${report.service}: ${verb} playlist ${report.playlistId}`);
   for (const r of unmatched(report)) {
@@ -57,7 +61,9 @@ program
         if (e instanceof AuthRequired) {
           console.error(`  ${e.service}: not authenticated — ${e.instructions}`);
         } else {
-          throw e;
+          // One service failing (e.g. a broken Amazon Music selector) must not stop
+          // the others from being tried.
+          console.error(`  ${name}: FAILED — ${(e as Error).message}`);
         }
       }
     }
@@ -124,7 +130,7 @@ program
       canonical.playlistIds[sourceName] = sourceId;
       console.log(`Synced "${playlistName}" from ${sourceName} (${canonical.tracks.length} tracks)`);
       for (const report of reports) {
-        canonical.playlistIds[report.service] = report.playlistId;
+        if (!report.error) canonical.playlistIds[report.service] = report.playlistId;
         printReport(report);
       }
 
@@ -196,6 +202,10 @@ jobs
       if (r.ok) {
         console.log(`${r.job.name}: synced ${r.trackCount} tracks`);
         for (const report of r.reports ?? []) {
+          if (report.error) {
+            console.log(`  ${report.service}: FAILED — ${report.error}`);
+            continue;
+          }
           console.log(`  ${report.service}: ${report.created ? "created" : "updated"} ${report.playlistId}`);
           if (report.unmatchedCount) console.log(`    ${report.unmatchedCount} unmatched`);
         }

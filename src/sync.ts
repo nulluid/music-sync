@@ -24,6 +24,9 @@ export interface ServiceReport {
   playlistId: string;
   createdPlaylist: boolean;
   results: TrackResult[];
+  /** Set when this target failed outright (e.g. Amazon Music selector broke) — the
+   *  other fields are empty placeholders in that case, not a real result. */
+  error?: string;
 }
 
 export function unmatched(report: ServiceReport): TrackResult[] {
@@ -96,7 +99,19 @@ export async function sync(
   const canonical = await download(sourceService, sourcePlaylistId, title);
   const reports: ServiceReport[] = [];
   for (const target of targetServices) {
-    reports.push(await upload(canonical, target));
+    try {
+      reports.push(await upload(canonical, target));
+    } catch (e) {
+      // One target failing (a broken Amazon Music selector, a revoked token) must
+      // not stop the others from syncing — each target is independent.
+      reports.push({
+        service: target.name,
+        playlistId: "",
+        createdPlaylist: false,
+        results: [],
+        error: (e as Error).message,
+      });
+    }
   }
   return { canonical, reports };
 }

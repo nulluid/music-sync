@@ -17,7 +17,13 @@ export interface JobRunResult {
   ok: boolean;
   error?: string;
   trackCount?: number;
-  reports?: { service: string; playlistId: string; created: boolean; unmatchedCount: number }[];
+  reports?: {
+    service: string;
+    playlistId: string;
+    created: boolean;
+    unmatchedCount: number;
+    error?: string;
+  }[];
 }
 
 const STATUS_FILE = pathFor("sync-status.json");
@@ -56,6 +62,7 @@ export async function runJob(job: SyncJob): Promise<JobRunResult> {
         playlistId: r.playlistId,
         created: r.createdPlaylist,
         unmatchedCount: unmatched(r).length,
+        error: r.error,
       })),
     };
     const status = readStatus();
