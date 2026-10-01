@@ -1,0 +1,35 @@
+[project]
+name = "music-sync"
+version = "0.1.0"
+description = "Cross-service playlist upload, sync, and backup for Spotify, YouTube Music, and Amazon Music"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.1",
+    "pydantic>=2.6",
+    "spotipy>=2.24",
+    "ytmusicapi>=1.8",
+    "playwright>=1.44",
+    "rapidfuzz>=3.9",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+music-sync = "music_sync.cli:cli"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-mock>=3.14",
+    "ruff>=0.5",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

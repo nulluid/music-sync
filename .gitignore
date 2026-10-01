@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# credentials and session state — never commit these
+.env
+config/
+*.secrets.json
+.spotify_cache
+.ytmusic_oauth.json
+.amazon_storage_state.json
+
+# playlist backups default to a local, gitignored dir
+backups/
