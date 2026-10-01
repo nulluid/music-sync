@@ -9,13 +9,20 @@
  * access; an individual doesn't. So this backend drives the real
  * music.amazon.com web UI instead.
  *
- * This makes it the most fragile of the three backends: the track-row
- * selectors in search/getPlaylistTracks/etc. are written from Amazon
- * Music's documented UI structure, not verified against a live session
- * (playlist management is behind login, which needs you present). Expect
- * this file to need small fixes when Amazon changes their frontend;
+ * This makes it the most fragile of the three backends. The frontend is a
+ * web-components SPA (every panel is a `<music-*>` custom element in an
+ * open shadow root; Playwright's locators pierce that automatically, so
+ * plain tag/text selectors work — but CSS classes are build-hashed, e.g.
+ * "WqhOM7Sh0Ie44RAqpyoY", and useless as selectors). findPlaylistByName is
+ * verified live (2026-10-01) against real tags (`a[href*="/my/playlists/"]`
+ * — no `data-testid` attributes exist anywhere in this app). search,
+ * getPlaylistTracks, createPlaylist, addTracks, and replaceTracks are
+ * still unverified guesses and will need the same live-DOM-inspection
+ * treatment before trusting them — deliberately deprioritized for now.
  * `npx playwright codegen https://music.amazon.com` (reusing the saved
- * storage state) is the fastest way to re-record a broken one.
+ * storage state) is the fastest way to iterate on a broken one; a quick
+ * recipe for finding a real selector is in findPlaylistByName's own
+ * history if you need the pattern again.
  *
  * One-time setup:
  *
@@ -141,13 +148,23 @@ export class AmazonMusicService implements MusicService {
   }
 
   async findPlaylistByName(name: string): Promise<string | null> {
+    // Verified live 2026-10-01: the frontend is a web-components SPA (every
+    // panel is a <music-*> custom element in an open shadow root — CSS
+    // classes are build-hashed and useless as selectors, e.g.
+    // "WqhOM7Sh0Ie44RAqpyoY"). Playwright's locators pierce open shadow DOM
+    // automatically, so plain tag/attribute selectors work once you know the
+    // real ones. Playlist tiles are <a href="/my/playlists/<uuid>"> — no
+    // data-testid attributes exist anywhere in this app.
     const page = await this.ensurePage();
     await page.goto(`${BASE_URL}/my/playlists`);
-    await page.waitForSelector('[data-testid="playlist-tile"]', { timeout: 15_000 });
-    for (const tile of await page.locator('[data-testid="playlist-tile"]').all()) {
-      const tileTitle = await tile.locator('[data-testid="playlist-title"]').innerText();
-      if (tileTitle.toLowerCase() === name.toLowerCase()) {
-        const href = (await tile.getAttribute("href")) ?? "";
+    const links = page.locator('a[href*="/my/playlists/"]');
+    await links.first().waitFor({ timeout: 15_000 });
+    const count = await links.count();
+    for (let i = 0; i < count; i++) {
+      const link = links.nth(i);
+      const text = (await link.innerText()).trim();
+      if (text.toLowerCase() === name.toLowerCase()) {
+        const href = (await link.getAttribute("href")) ?? "";
         return href.replace(/\/$/, "").split("/").pop() ?? null;
       }
     }
