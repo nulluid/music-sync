@@ -15,7 +15,7 @@ which is exactly what the JSPF spec's `extension` field is for.
 {
   "playlist": {
     "title": "Long Drives",
-    "creator": "jason",
+    "creator": "you",
     "date": "2026-10-01T00:00:00Z",
     "extension": {
       "https://music.smathe.rs/ns#": {

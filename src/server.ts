@@ -21,7 +21,7 @@ const GOOGLE_CLIENT_ID = ADMIN_ENV.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = ADMIN_ENV.GOOGLE_CLIENT_SECRET;
 // Lowercased once here so every comparison downstream is case-insensitive —
 // Google's userinfo endpoint returns the account's originally-registered
-// casing (confirmed live: "Jason@Smathe.rs"), not the lowercase form.
+// casing, not the lowercase form (confirmed live against a real account).
 const ADMIN_EMAIL = ADMIN_ENV.ADMIN_EMAIL?.toLowerCase();
 const SESSION_SECRET = ADMIN_ENV.SESSION_SECRET;
 

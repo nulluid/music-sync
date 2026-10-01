@@ -5,8 +5,9 @@
  * `email.expiry` keyed by SESSION_SECRET, so a client can't forge or extend
  * it. The email is base64url-encoded before embedding: a real email address
  * contains a literal "." (the domain), which broke naive dot-splitting —
- * confirmed live, jason@smathe.rs always failed verification because
- * splitting on "." produced four parts instead of three.
+ * confirmed live: any email with a multi-part domain (i.e. almost every
+ * real one) always failed verification because splitting on "." produced
+ * four or more parts instead of three.
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";

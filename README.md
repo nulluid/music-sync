@@ -11,14 +11,14 @@ Credentials live in `~/.config/music-sync/`, which is never committed.
 ### Spotify — done
 
 An app is already registered (`music-sync`, client ID in `~/.config/music-sync/spotify.env`) and
-authenticated as Jason. Re-run `music-sync auth spotify` only if the token cache is deleted or
-access is revoked.
+authenticated. Re-run `music-sync auth spotify` only if the token cache is deleted or access is
+revoked.
 
 ### YouTube Music — one step left
 
 A Google Cloud OAuth client is already registered (`music-sync`, type "TVs and Limited Input
 devices", credentials in `~/.config/music-sync/ytmusic.env`, project `claude-mcp-personal-8193`,
-test user `Jason@Smathe.rs`). Run `music-sync auth ytmusic` and finish the Google sign-in — it
+test user: your own Google account). Run `music-sync auth ytmusic` and finish the Google sign-in — it
 stopped at a passkey/biometric prompt that needed you physically present, so the login itself isn't
 done yet.
 
