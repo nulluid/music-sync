@@ -136,6 +136,31 @@ export async function upload(playlist: Playlist, service: MusicService): Promise
   return { service: service.name, playlistId, createdPlaylist: created, results };
 }
 
+/**
+ * Append `newTracks` to an existing playlist on `service` without touching
+ * what's already there — distinct from upload()'s create-or-replace, for
+ * "add these songs to the playlist" instead of "make the playlist exactly
+ * this list."
+ */
+export async function appendTracks(
+  playlistId: string,
+  service: MusicService,
+  newTracks: Track[]
+): Promise<ServiceReport> {
+  const results = await Promise.all(newTracks.map((t) => resolveTrackId(service, t)));
+  const trackIds = results.map((r) => r.serviceTrackId).filter((id): id is string => id !== null);
+
+  const errored = results.filter((r) => r.status === "error");
+  if (errored.length > 0) {
+    throw new Error(
+      `${errored.length}/${results.length} new tracks could not be searched — refusing to add a partial batch`
+    );
+  }
+
+  await service.addTracks(playlistId, trackIds);
+  return { service: service.name, playlistId, createdPlaylist: false, results };
+}
+
 function trackFromCandidate(c: Candidate): Track {
   return newTrack({ title: c.title, creator: c.artist, album: c.album, duration: c.duration, isrc: c.isrc });
 }
