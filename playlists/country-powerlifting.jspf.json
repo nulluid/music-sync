@@ -1,0 +1,38 @@
+{
+  "playlist": {
+    "title": "Country Powerlifting",
+    "extension": {
+      "https://music.smathe.rs/ns#": {
+        "sourceOfTruth": "ytmusic"
+      }
+    },
+    "track": [
+      { "title": "Axe", "creator": "The Steel Woods" },
+      { "title": "Devil in This Holler", "creator": "The Steel Woods" },
+      { "title": "Rock That Says My Name", "creator": "The Steel Woods" },
+      { "title": "God's Gonna Cut You Down", "creator": "Johnny Cash" },
+      { "title": "Heavy Is the Head", "creator": "Zac Brown Band feat. Chris Cornell" },
+      { "title": "White Horse", "creator": "Chris Stapleton" },
+      { "title": "Watch You Burn", "creator": "Chris Stapleton" },
+      { "title": "JACK", "creator": "HARDY" },
+      { "title": "Loud and Heavy", "creator": "Cody Jinks" },
+      { "title": "Midnight Train to Memphis", "creator": "Chris Stapleton" },
+      { "title": "I'm the Worst", "creator": "Treaty Oak Revival" },
+      { "title": "Waiting for the Thunder", "creator": "Blackberry Smoke" },
+      { "title": "Bad as I Used to Be", "creator": "Chris Stapleton" },
+      { "title": "Shootout in Saraland", "creator": "Muscadine Bloodline" },
+      { "title": "Southern Hospitality", "creator": "Disciple" },
+      { "title": "Lonely Train", "creator": "Black Stone Cherry" },
+      { "title": "Head Down", "creator": "The Showdown" },
+      { "title": "Out of the Blue", "creator": "The Steel Woods" },
+      { "title": "Lend a Hand", "creator": "The Georgia Thunderbolts" },
+      { "title": "Dig a Hole", "creator": "Blackberry Smoke" },
+      { "title": "Blind Man", "creator": "Black Stone Cherry" },
+      { "title": "All Rise Again", "creator": "Blackberry Smoke feat. Warren Haynes" },
+      { "title": "Black Soul Choir", "creator": "16 Horsepower" },
+      { "title": "Run Devil Run", "creator": "Crowder" },
+      { "title": "Step Up (I'm On It)", "creator": "Maylene and the Sons of Disaster" },
+      { "title": "Let Me Help You (Find the Door)", "creator": "Blackberry Smoke" }
+    ]
+  }
+}
