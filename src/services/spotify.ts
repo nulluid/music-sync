@@ -202,8 +202,11 @@ export class SpotifyService implements MusicService {
     let next: string | null = `/playlists/${playlistId}/items?limit=100`;
     while (next) {
       const data: any = await this.api(next);
-      for (const item of data.items) {
-        if (item.track?.id) out.push(this.candidateFromTrack(item.track));
+      for (const entry of data.items) {
+        // The Feb 2026 endpoint rename (/tracks -> /items) also renamed this
+        // nested field from `track` to `item` — confirmed live, not just in
+        // the docs. Silently returns an empty list otherwise, no error.
+        if (entry.item?.id) out.push(this.candidateFromTrack(entry.item));
       }
       next = data.next ? data.next.slice(API_BASE.length) : null;
     }

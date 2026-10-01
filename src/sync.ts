@@ -166,6 +166,21 @@ export async function sync(
   title?: string
 ): Promise<{ canonical: Playlist; reports: ServiceReport[] }> {
   const canonical = await download(sourceService, sourcePlaylistId, title);
+
+  // Refuse to propagate an empty source automatically. In practice this has
+  // meant "a bug silently returned zero tracks" far more often than "the user
+  // really emptied the playlist" — confirmed twice tonight (a quota error
+  // and a Spotify field-rename both masqueraded as an empty playlist and
+  // would have wiped an already-correct target via replaceTracks([])). A
+  // genuine intentional empty-out should go through upload()/the CLI
+  // directly, not the unattended scheduler.
+  if (canonical.tracks.length === 0) {
+    throw new Error(
+      `${sourceService.name} playlist "${canonical.title}" has 0 tracks — refusing to sync an empty ` +
+        `source onto ${targetServices.map((s) => s.name).join(", ")} (this is more often a bug than intent)`
+    );
+  }
+
   const reports: ServiceReport[] = [];
   for (const target of targetServices) {
     try {

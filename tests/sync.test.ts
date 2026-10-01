@@ -174,6 +174,21 @@ describe("sync", () => {
     expect(target.playlists[reports[0].playlistId]).toEqual(["yt1"]);
   });
 
+  it("refuses to sync an empty source rather than wiping a populated target", async () => {
+    // Regression test for a real incident: a Spotify API field rename made
+    // getPlaylistTracks() silently return zero tracks (no error), and sync()
+    // mirrored that onto an already-correct target, wiping it.
+    const source = new FakeService("ytmusic", [], { src: [] });
+    source.titles.src = "Country Powerlifting";
+
+    const target = new FakeService("spotify", [], { existing: ["track-1", "track-2"] });
+    target.titles.existing = "Country Powerlifting";
+
+    await expect(sync(source, "src", [target], "Country Powerlifting")).rejects.toThrow(/0 tracks/);
+
+    expect(target.playlists.existing).toEqual(["track-1", "track-2"]);
+  });
+
   it("completes the tracks it can match even when a target lacks one", async () => {
     const source = new FakeService(
       "spotify",
